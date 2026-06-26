@@ -94,3 +94,23 @@ CREATE TABLE application_notifications (
 The original verification query under review is structured as follows:
 ```sql
 SELECT * FROM notifications WHERE studentID = 1042 AND isRead = false ORDER BY createdAt ASC;
+
+---
+
+## Stage 4: High Load Caching Architectures
+
+To prevent high-volume database saturation during peak traffic periods (e.g., right when a placement or result notification goes live), a high-performance memory caching layer is introduced.
+
+### 1. In-Memory Caching Strategy: Redis Cache-Aside
+We implement an asynchronous **Cache-Aside (Lazy Loading)** architecture pattern using Redis as our fast in-memory store. 
+
+* **The Flow:** When a client application fetches notifications, the application gateway first queries Redis using a unique key configuration based on the student's ID (e.g., `user:1042:notifications`). If a cache hit occurs, data is returned instantly within `<2ms`. If a cache miss occurs, the backend reads from PostgreSQL, updates the Redis key with an explicit Time-To-Live (TTL) configuration, and yields the response payload.
+
+---
+
+### 2. Tradeoff Assessment Matrix
+
+| Caching Strategy | Advantages / Pros | Risks / Disadvantages | Architectural Mitigation Strategy |
+| :--- | :--- | :--- | :--- |
+| **Redis Cache-Aside (In-Memory)** | • Removes heavy read contention off PostgreSQL disk layers.<br>• Drastically reduces application request latency. | • High risk of serving stale data if database updates occur behind the cache layer. | • Execute strict cache eviction routines inside the API whenever a notification read state changes or a new entry is posted. |
+| **HTTP Conditional Headers (`ETag`)** | • Eliminates downstream bandwidth usage completely for unchanged feeds.<br>• Offloads network serialization strains. | • The request must still hit the application gateway to compare validation tags. | • Combine ETags with an ultra-short lifespan memory verification loop to prevent downstream DB checks. |
