@@ -182,3 +182,49 @@ async function handleBackgroundJob(jobMessage) {
         }
     }
 }
+
+---
+
+## Stage 7: Frontend Interface Engineering & Client-Side Logic Strategy
+
+### 1. Architectural Strategy For State Syncing and Real-Time Flows
+To manage real-time streams gracefully without causing jarring page jumps for the student, the client implementation decouples data ingestion from layout rendering:
+* **Incoming Feed Staging Buffer:** Incoming real-time events received from the persistent connection pool are funneled into an out-of-band state buffer array instead of instantly mutating the active UI layout array.
+* **Non-Disruptive UX Indicators:** When a notification hits the engine, a subtle global header ribbon alert signals *"New updates available—click to refresh context"*. This gives users full control, keeping their active reading view stable and uninhibited.
+
+---
+
+### 2. State Sync Optimization Plan
+* **Fine-Grained Re-rendering:** Components utilize isolated key references (`item.uuid`) on layout maps, optimizing reconciliation sweeps. The virtual DOM pinpoints and mutates only the modified cards, avoiding global layout loops.
+* **Debounced State Merges:** State updates triggered during massive real-time events are batch-processed down to single render executions across 300ms intervals, preventing UI rendering freezes.
+
+---
+
+## Stage 6: Priority Inbox Implementation & Evaluation Logistics
+
+### 1. Architectural Strategy For Ranking Notification Verticals
+The prioritization execution pipeline implements a strict multi-layered bubble sorting framework to match user-defined priority levels without database compute requirements. The evaluation layers isolate priorities using two clear filters:
+* **Primary Stratum Rule (Category Matrix):** System items are ranked against a pre-calculated mapping layer where `Placement = 3`, `Result = 2`, and `Event = 1`. 
+* **Secondary Stratum Rule (Chronological Cascading):** If two items share identical category weight groups, the sorting utility resolves conflicts by measuring chronological timestamps, ensuring the latest announcements occupy top positioning slots.
+
+---
+
+### 2. High-Efficiency Sorting Maintenance Strategy
+As notifications continuously stream downstream to thousands of clients, keeping the top 10 positions accurate without performance lag requires smart handling:
+* **Local Heap Tracking:** Instead of fetching or sorting the entire multi-semester history, the client architecture handles insertion operations inside a local bound **Min-Heap array dataset structure** set to size `n`.
+* **Bounded Insertion Complexity:** Inserting incoming real-time notifications into a bounded Min-Heap limits sorting overhead to an execution runtime complexity of $O(\log n)$. Since $n$ stays small (e.g., 10 or 20 records), updates remain instant and lightning-fast.
+
+---
+
+## Stage 7: Frontend Interface Engineering & Client-Side Logic Strategy
+
+### 1. Architectural Strategy For State Syncing and Real-Time Flows
+To manage real-time streams gracefully without causing jarring page jumps for the student, the client implementation decouples data ingestion from layout rendering:
+* **Incoming Feed Staging Buffer:** Incoming real-time events received from the persistent connection pool are funneled into an out-of-band state buffer array instead of instantly mutating the active UI layout array.
+* **Non-Disruptive UX Indicators:** When a notification hits the engine, a subtle global header ribbon alert signals *"New updates available—click to refresh context"*. This gives users full control, keeping their active reading view stable and uninhibited.
+
+---
+
+### 2. State Sync Optimization Plan
+* **Fine-Grained Re-rendering:** Components utilize isolated key references (`item.uuid`) on layout maps, optimizing reconciliation sweeps. The virtual DOM pinpoints and mutates only the modified cards, avoiding global layout loops.
+* **Debounced State Merges:** State updates triggered during massive real-time events are batch-processed down to single render executions across 300ms intervals, preventing UI rendering freezes.

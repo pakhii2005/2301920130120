@@ -1,232 +1,185 @@
-/**
- * Campus Notification Platform - Optimized High-Performance Dashboard
- * Styling Paradigm: Strictly Material UI Core Engine Components
- * Middleware Rule: Extensive custom logging integration applied.
- */
 import React, { useState, useEffect } from 'react';
-import { 
-  Container, 
-  Typography, 
-  Tabs, 
-  Tab, 
-  Box, 
-  AppBar, 
-  Toolbar, 
-  CircularProgress, 
-  Alert,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem
-} from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import StarIcon from '@mui/icons-material/Star';
-import axios from 'axios';
-import { AppLogger } from './services/logger';
 
-const WEIGHT_MATRIX = { 'Placement': 3, 'Result': 2, 'Event': 1 };
-const ENDPOINT_URL = 'http://42.224.186.213/evaluation-service/notifications';
+export default function NotificationDashboard() {
+  const [notifications, setNotifications] = useState([]);
+  const [selectedFilter, setSelectedFilter] = useState('All');
+  const [loadingState, setLoadingState] = useState(true);
+  const [networkError, setNetworkError] = useState(null);
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [errorStatus, setErrorStatus] = useState(null);
-  const [masterNotifications, setMasterNotifications] = useState([]);
-  const [categoryFilter, setCategoryFilter] = useState('All');
-
+  // Core Evaluation Service Endpoint
+const FEED_API_URI = 'http://localhost:5001/api/v1/notifications';
   useEffect(() => {
-    // Edge-Case Mitigation: Instantiate AbortController to handle abrupt view unmounts safely
-    const infrastructureAbortController = new AbortController();
-    
-    const streamIngressPipeline = async () => {
+    async function pullNotificationFeed() {
       try {
-        AppLogger.info('AppInit', 'Triggering target notification pipeline fetch.');
-        setLoading(true);
-        
-        const requestPayload = await axios.get(ENDPOINT_URL, {
-          signal: infrastructureAbortController.signal
-        });
-        
-        if (requestPayload.data && Array.isArray(requestPayload.data.notifications)) {
-          setMasterNotifications(requestPayload.data.notifications);
-          AppLogger.success('AppInit', `Successfully structuralized ${requestPayload.data.notifications.length} notices.`);
-        } else {
-          throw new Error('Data validation exception: Invalid schema return contract.');
+        setLoadingState(true);
+        const feedback = await fetch(FEED_API_URI);
+        if (!feedback.ok) {
+          throw new Error(`Server returned faulty status code: ${feedback.status}`);
         }
+        const dataPayload = await feedback.json();
+        
+        // Base mapping to ensure clean field properties
+        const normalizedFeed = (dataPayload.notifications || []).map(item => ({
+          uuid: item.ID || Math.random().toString(36).substring(2),
+          category: item.Type || 'Event',
+          title: item.Title || 'System Alert',
+          content: item.Message || '',
+          timestamp: item.Timestamp || new Date().toISOString(),
+          isRead: false // UI initial state parameter
+        }));
+
+        setNotifications(normalizedFeed);
       } catch (err) {
-        if (axios.isCancel(err)) {
-          AppLogger.warn('AppInit', 'Data fetch routine gracefully aborted via component cleanup.');
-        } else {
-          AppLogger.error('AppInit', 'Exception caught while processing API ingestion.', err);
-          setErrorStatus(err.message || 'Failed to pull live server records.');
-        }
+        setNetworkError(err.message);
       } finally {
-        setLoading(false);
+        setLoadingState(false);
       }
-    };
+    }
 
-    streamIngressPipeline();
-
-    // Cleanup phase tracking closure to ensure no stray memory bindings remain active
-    return () => {
-      AppLogger.info('AppCleanup', 'Executing pipeline abort connection cleanup.');
-      infrastructureAbortController.abort();
-    };
+    pullNotificationFeed();
   }, []);
 
-  const filteredDataset = masterNotifications.filter(item => {
-    if (categoryFilter === 'All') return true;
-    return item.Type === categoryFilter;
-  });
-
-  const calculatedPriorityInbox = [...masterNotifications]
-    .sort((a, b) => {
-      const weightA = WEIGHT_MATRIX[a.Type] || 0;
-      const weightB = WEIGHT_MATRIX[b.Type] || 0;
-      if (weightA === weightB) {
-        return new Date(b.Timestamp) - new Date(a.Timestamp);
-      }
-      return weightB - weightA;
-    })
-    .slice(0, 10);
-
-  return (
-    <Box sx={{ flexGrow: 1, backgroundColor: '#f4f6f9', minHeight: '100vh' }}>
-      <AppBar position="static" color="primary" elevation={1}>
-        <Toolbar sx={{ backgroundColor: '#1a237e' }}>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: '700', letterSpacing: '0.5px' }}>
-            🎓 Campus Announcement & Alerts Portal
-          </Typography>
-        </Toolbar>
-      </AppBar>
-
-      <Container maxWidth="md" sx={{ mt: 5, mb: 5 }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
-          <Tabs 
-            value={activeTab} 
-            onChange={(e, index) => {
-              AppLogger.info('NavigationUI', `Switched view mode pointer to tab: ${index}`);
-              setActiveTab(index);
-            }} 
-            textColor="primary"
-            indicatorColor="primary"
-            centered
-          >
-            <Tab icon={<DashboardIcon />} label="Main Stream Dashboard" sx={{ fontWeight: '600' }} />
-            <Tab icon={<StarIcon />} label="Priority Inbox (Top 10)" sx={{ fontWeight: '600' }} />
-          </Tabs>
-        </Box>
-
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
-            <CircularProgress size={45} thickness={4.5} />
-          </Box>
-        )}
-
-        {errorStatus && (
-          <Alert severity="error" variant="filled" sx={{ mt: 2, borderRadius: 2 }}>{errorStatus}</Alert>
-        )}
-
-        {!loading && !errorStatus && (
-          <Box>
-            {activeTab === 0 && (
-              <Box>
-                <FormControl fullWidth size="medium" sx={{ mb: 3, backgroundColor: '#fff', borderRadius: 1 }}>
-                  <InputLabel id="category-filter-label">Filter Announcement Type</InputLabel>
-                  <Select
-                    labelId="category-filter-label"
-                    value={categoryFilter}
-                    label="Filter Announcement Type"
-                    onChange={(e) => {
-                      AppLogger.info('FilterUI', `User modified category focus to: ${e.target.value}`);
-                      setCategoryFilter(e.target.value);
-                    }}
-                  >
-                    <MenuItem value="All">All Notifications</MenuItem>
-                    <MenuItem value="Placement">Placements Only</MenuItem>
-                    <MenuItem value="Result">Academic Results</MenuItem>
-                    <MenuItem value="Event">Campus Events</MenuItem>
-                  </Select>
-                </FormControl>
-
-                {filteredDataset.length === 0 ? (
-                  <Typography align="center" color="textSecondary" sx={{ py: 6, fontStyle: 'italic' }}>
-                    No matching notices found in this sector.
-                  </Typography>
-                ) : (
-                  filteredDataset.map((item) => <NotificationCard key={item.ID} record={item} />)
-                )}
-              </Box>
-            )}
-
-            {activeTab === 1 && (
-              <Box>
-                <Alert severity="info" color="primary" sx={{ mb: 3, borderRadius: 2, fontWeight: 500 }}>
-                  Sorted algorithmically by target classification weight hierarchy and publication sequence.
-                </Alert>
-                {calculatedPriorityInbox.map((item) => <NotificationCard key={item.ID} record={item} isPriority />)}
-              </Box>
-            )}
-          </Box>
-        )}
-      </Container>
-    </Box>
+  // Filter actions computation
+  const filteredCollection = notifications.filter(item => 
+    selectedFilter === 'All' ? true : item.category === selectedFilter
   );
-}
 
-function NotificationCard({ record, isPriority }) {
-  const getBadgeColor = (type) => {
-    switch(type) {
-      case 'Placement': return '#e1f5fe';
-      case 'Result': return '#e8f5e9';
-      case 'Event': return '#fff3e0';
-      default: return '#f5f5f5';
-    }
+  // Dynamically compute unread items count
+  const totalUnreadCount = notifications.filter(item => !item.isRead).length;
+
+  const toggleReadStatus = (targetUuid) => {
+    setNotifications(prevItems => 
+      prevItems.map(item => 
+        item.uuid === targetUuid ? { ...item, isRead: !item.isRead } : item
+      )
+    );
   };
 
-  const getTextColor = (type) => {
-    switch(type) {
-      case 'Placement': return '#0288d1';
-      case 'Result': return '#2e7d32';
-      case 'Event': return '#ef6c00';
-      default: return '#757575';
-    }
-  };
+  if (loadingState) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem', fontFamily: 'sans-serif' }}>
+        <p style={{ fontSize: '1.25rem', color: '#4b5563' }}>Loading current notification matrix streams...</p>
+      </div>
+    );
+  }
+
+  if (networkError) {
+    return (
+      <div style={{ maxWidth: '600px', margin: '2rem auto', padding: '1rem', border: '1px solid #fca5a5', backgroundColor: '#fef2f2', borderRadius: '8px', fontFamily: 'sans-serif' }}>
+        <h3 style={{ color: '#b91c1c', marginTop: 0 }}>System Connection Fault</h3>
+        <p style={{ color: '#7f1d1d' }}>{networkError}</p>
+      </div>
+    );
+  }
 
   return (
-    <Box sx={{
-      p: 3,
-      mb: 2.5,
-      borderRadius: 2,
-      backgroundColor: '#ffffff',
-      boxShadow: '0px 2px 8px rgba(0,0,0,0.04)',
-      borderLeft: `6px solid ${isPriority ? '#d32f2f' : getTextColor(record.Type)}`,
-      transition: 'all 0.2s ease-in-out',
-      '&:hover': { 
-        transform: 'translateY(-2px)',
-        boxShadow: '0px 4px 12px rgba(0,0,0,0.08)'
-      }
-    }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-        <Box sx={{
-          px: 1.8,
-          py: 0.4,
-          borderRadius: 1.5,
-          fontSize: '0.7rem',
-          fontWeight: '700',
-          letterSpacing: '0.8px',
-          backgroundColor: getBadgeColor(record.Type),
-          color: getTextColor(record.Type)
-        }}>
-          {record.Type.toUpperCase()}
-        </Box>
-        <Typography variant="caption" sx={{ color: '#90a4ae', fontWeight: 500 }}>
-          {new Date(record.Timestamp).toLocaleString()}
-        </Typography>
-      </Box>
-      <Typography variant="body1" sx={{ color: '#2c3e50', fontWeight: 500, lineHeight: 1.5 }}>
-        {record.Message}
-      </Typography>
-    </Box>
+    <div style={{ maxWidth: '850px', margin: '0 auto', padding: '2rem', fontFamily: 'system-ui, sans-serif', color: '#1f2937' }}>
+      
+      {/* Header Container Area */}
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #e5e7eb', paddingBottom: '1.5rem', marginBottom: '2rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: '700', margin: 0, color: '#111827' }}>Campus Hub Notification Center</h1>
+          <p style={{ color: '#6b7280', margin: '0.25rem 0 0 0' }}>Stay updated with real-time academic feeds</p>
+        </div>
+        <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '20px', padding: '0.5rem 1rem', color: '#1e40af', fontWeight: '600', fontSize: '0.875rem' }}>
+          Active Unread Items: {totalUnreadCount}
+        </div>
+      </header>
+
+      {/* Filter Control Section */}
+      <nav style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
+        {['All', 'Placement', 'Result', 'Event'].map(type => (
+          <button
+            key={type}
+            onClick={() => setSelectedFilter(type)}
+            style={{
+              padding: '0.5rem 1.25rem',
+              borderRadius: '6px',
+              border: '1px solid #d1d5db',
+              cursor: 'pointer',
+              fontWeight: '500',
+              fontSize: '0.875rem',
+              transition: 'all 0.2s',
+              backgroundColor: selectedFilter === type ? '#2563eb' : '#ffffff',
+              color: selectedFilter === type ? '#ffffff' : '#374151'
+            }}
+          >
+            {type}
+          </button>
+        ))}
+      </nav>
+
+      {/* Main Feed Container Section */}
+      <main style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {filteredCollection.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '3rem', border: '2px dashed #e5e7eb', borderRadius: '8px', color: '#6b7280' }}>
+            No notifications found matching the selected category filter criteria.
+          </div>
+        ) : (
+          filteredCollection.map(item => (
+            <section 
+              key={item.uuid}
+              style={{
+                padding: '1.25rem',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                backgroundColor: item.isRead ? '#f9fafb' : '#ffffff',
+                borderLeft: item.isRead ? '4px solid #d1d5db' : 
+                             item.category === 'Placement' ? '4px solid #db2777' : 
+                             item.category === 'Result' ? '4px solid #9333ea' : '4px solid #ea580c',
+                opacity: item.isRead ? 0.75 : 1,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: '1.5rem'
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '4px',
+                    backgroundColor: item.category === 'Placement' ? '#fce7f3' : item.category === 'Result' ? '#f3e8ff' : '#ffedd5',
+                    color: item.category === 'Placement' ? '#9d174d' : item.category === 'Result' ? '#6b21a8' : '#9a3412'
+                  }}>
+                    {item.category}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                    {new Date(item.timestamp).toLocaleString()}
+                  </span>
+                </div>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: '600', margin: '0 0 0.5rem 0', color: item.isRead ? '#4b5563' : '#111827' }}>
+                  {item.title}
+                </h2>
+                <p style={{ fontSize: '0.925rem', margin: 0, color: '#4b5563', lineHeight: '1.4' }}>
+                  {item.content}
+                </p>
+              </div>
+
+              <button
+                onClick={() => toggleReadStatus(item.uuid)}
+                style={{
+                  flexShrink: 0,
+                  padding: '0.375rem 0.75rem',
+                  fontSize: '0.75rem',
+                  fontWeight: '600',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: item.isRead ? '#ffffff' : '#f3f4f6',
+                  color: '#374151'
+                }}
+              >
+                {item.isRead ? 'Mark Unread' : 'Mark Read'}
+              </button>
+            </section>
+          ))
+        )}
+      </main>
+    </div>
   );
 }
