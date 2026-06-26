@@ -86,3 +86,11 @@ CREATE TABLE application_notifications (
     is_read_acknowledged BOOLEAN DEFAULT FALSE NOT NULL,
     disseminated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 )
+---
+
+## Stage 3: Query Optimization Mechanics & Index Strategy
+
+### 1. Architectural Audit of the Legacy Query
+The original verification query under review is structured as follows:
+```sql
+SELECT * FROM notifications WHERE studentID = 1042 AND isRead = false ORDER BY createdAt ASC;
